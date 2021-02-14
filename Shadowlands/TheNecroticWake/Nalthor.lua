@@ -26,16 +26,19 @@ function mod:GetOptions()
 	return {
 		320772, -- Comet Storm
 		321368, -- Icebound Aegis
-		{320788, "SAY"}, -- Frozen Binds
+		{320788, "ICON", "SAY"}, -- Frozen Binds
 		321894, -- Dark Exile
 	}
 end
 
 function mod:OnBossEnable()
 	self:Log("SPELL_CAST_START", "CometStorm", 320772)
-	self:Log("SPELL_AURA_APPLIED", "IceboundAegisApplied", 321368)
-	self:Log("SPELL_AURA_REMOVED", "IceboundAegisRemoved", 321368)
-	self:Log("SPELL_CAST_SUCCESS", "FrozenBinds", 320788)
+	self:Log("SPELL_AURA_APPLIED", "IceboundAegisApplied", 321368, 321754) -- normal/heroic, mythic
+	self:Log("SPELL_AURA_REMOVED", "IceboundAegisRemoved", 321368, 321754)
+	self:Log("SPELL_CAST_START", "FrozenBinds", 320788)
+	self:Log("SPELL_CAST_SUCCESS", "FrozenBindsSuccess", 320788)
+	self:Log("SPELL_AURA_REMOVED", "FrozenBindsRemoved", 320788)
+	self:Log("SPELL_MISSED", "FrozenBindsRemoved", 320788) -- Anti-Magic Shell, Hand of Freedom, immunities, etc.
 	self:Log("SPELL_CAST_SUCCESS", "DarkExile", 321894)
 end
 
@@ -58,31 +61,48 @@ function mod:CometStorm(args)
 end
 
 do
-	local seconds = 0
+	local appliedAt = 0
 	function mod:IceboundAegisApplied(args)
-		seconds = args.time
-		self:Message(args.spellId, "cyan")
-		self:PlaySound(args.spellId, "info")
-		self:Bar(args.spellId, 25.5)
+		appliedAt = args.time
+
+		self:Message(321368, "cyan")
+		self:PlaySound(321368, "info")
+		self:Bar(321368, 25.5)
 	end
 
 	function mod:IceboundAegisRemoved(args)
-		seconds = math.floor((args.time - seconds) * 100)/100
-		self:Message(args.spellId, "green", L.aegis:format(args.spellName, seconds))
+		self:Message(321368, "green", L.aegis:format(args.spellName, args.time - appliedAt))
 	end
 end
 
-function mod:FrozenBinds(args)
+do
+	local function printTarget(self, name, guid)
+		self:TargetMessage(320788, "orange", name, CL.casting:format(self:SpellName(320788)))
+		self:PlaySound(320788, "alert", nil, name)
+		self:PrimaryIcon(320788, name)
+	end
+
+	function mod:FrozenBinds(args)
+		self:GetBossTarget(printTarget, 0.4, args.sourceGUID)
+	end
+end
+
+function mod:FrozenBindsSuccess(args)
 	self:TargetMessage(args.spellId, "red", args.destName)
 	self:PlaySound(args.spellId, "alarm", nil, args.destName)
 	if self:Me(args.destGUID) then
 		self:Say(args.spellId)
 	end
 	self:Bar(args.spellId, 25.5)
+	self:PrimaryIcon(args.spellId, args.destName)
+end
+
+function mod:FrozenBindsRemoved(args)
+	self:PrimaryIcon(args.spellId)
 end
 
 function mod:DarkExile(args)
 	self:TargetMessage(args.spellId, "yellow", args.destName)
-	self:PlaySound(args.spellId, "alert", nil, args.destName)
+	self:PlaySound(args.spellId, "long", nil, args.destName)
 	self:CDBar(args.spellId, 35)
 end
